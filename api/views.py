@@ -104,6 +104,7 @@ class ChangePassword(APIView):
 
         if serializer.is_valid():
             user.set_password(serializer.validated_data['new_password'])
+            user.is_temp_password = False
             user.save()
 
             # Actualizar la sesion de usuario
