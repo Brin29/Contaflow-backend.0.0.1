@@ -2,20 +2,28 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from .serializers import UserSerializer
+from .serializers import UserSerializer, CustomTokenObtainPairSerializar
+from rest_framework_simplejwt.views import TokenObtainPairView
 from django.template.loader import get_template
 from rest_framework import permissions
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from .permissions import IsAdmin, IsAuditor, IsCliente, IsContador
+from .serializers import ChangePasswordSerializer
+from django.contrib.auth import update_session_auth_hash
 from django.utils import timezone
+from django.contrib.auth import get_user_model
+from .models import User
 import string
 import secrets
 
+User = get_user_model() 
+
 # Vista de registro que maneja la administradora
+# Solo en la fase de desarrollo
 class RegisterView(APIView):
     serializer_class = UserSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.AllowAny] 
 
     def post(self, request):
         serializer = UserSerializer(data=request.data)
@@ -24,15 +32,22 @@ class RegisterView(APIView):
 
         return Response(serializer.data)
 
-
-class Home(APIView):
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        content = {'message': 'Hello, World!'}
-        return Response(content)
+# Prueba de los endpoints
+class UserView(APIView):
+    serializer_class = UserSerializer
+    permission_classes = [permissions.AllowAny] 
     
+    def get(self, request, user_id):
+
+        try:
+            user = User.objects.get(id=user_id)
+            serializer = UserSerializer(user)
+            return Response(serializer.data)
+        except User.DoesNotExist:
+            return Response({'error': 'Usuario no encontrado'})
+
+    
+# Envio para agregar clientes y guardar en la base de datos
 class sendEmail(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated, IsAdmin]
@@ -46,6 +61,7 @@ class sendEmail(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
 
+        # Contraseña temporal
         user.set_password(temp_password)
         user.is_temp_password = True
         user.temp_password_date = timezone.now()
@@ -55,6 +71,7 @@ class sendEmail(APIView):
         username = request.data['username']
         role = request.data['role']
 
+        # datos del correo
         mail = create_email(
             email,
             'Enlace de Ingreso',
@@ -67,12 +84,35 @@ class sendEmail(APIView):
             }
         )
 
+        # Envio del correo
         mail.send(fail_silently=False)
 
         return Response({
             'message': 'Work'
         })
 
+#  Cambio de contraseña
+class ChangePassword(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        # tomar al usuario
+        user = request.user
+        # validar las contraseñas
+        serializer = ChangePasswordSerializer(data=request.data, context={'user': user})
+
+        if serializer.is_valid():
+            user.set_password(serializer.validated_data['new_password'])
+            user.save()
+
+            # Actualizar la sesion de usuario
+            update_session_auth_hash(request, user)
+
+            return Response ({'message': 'Contraseña cambiada exitosamente'})
+
+        else:
+            return Response({'contraseña': 'incorrecta'})
 
 # Vista en la que solo el admnistrador tiene acceso
 class AdminView(APIView):
@@ -90,6 +130,10 @@ class ClientView(APIView):
     def get(self, request):
         content = {'message': 'Hello, Client!'}
         return Response(content)
+    
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializar
 
 # ********* FUNCIONES **********
 
