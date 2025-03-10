@@ -9,6 +9,7 @@ class User(AbstractUser):
         ('AUDITOR', 'Auditor'),
         ('CLIENTE', 'Cliente')
     )
+    phone_number = models.TextField(blank=True, null=True)
     is_temp_password = models.BooleanField(default=False, null=True)
     role = models.CharField(max_length=50, choices=ROLES, default='CLIENTE')
     temp_password_date = models.DateTimeField(null=True, blank=True)

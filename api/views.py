@@ -46,6 +46,15 @@ class UserView(APIView):
         except User.DoesNotExist:
             return Response({'error': 'Usuario no encontrado'})
 
+class UsersView(APIView):
+    serializer_class = UserSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        users = User.objects.all()
+        serializer = UserSerializer(users, many=True)
+        return Response(serializer.data)
+
     
 # Envio para agregar clientes y guardar en la base de datos
 class sendEmail(APIView):
