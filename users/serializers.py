@@ -4,18 +4,25 @@ from datetime import timedelta
 from rest_framework.exceptions import AuthenticationFailed
 from django.utils import timezone
 from django.contrib.auth.password_validation import validate_password
-from django.contrib.auth import authenticate
-from rest_framework.response import Response
-from .models import User
+from .models import User, Company
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'username', 'password', 'role',  'phone_number', 'is_temp_password')
+        fields = ('id', 'first_name', 'last_name' ,'username', 'password', 'role',  'phone_number', 'is_temp_password')
 
     def create(self, validated_data):
         user = User.objects.create_user(**validated_data)
         return user
+
+class CompaySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Company
+        fields = ('id', 'nit', 'address', 'economic_sector')
+
+    def create(self, validated_data):
+        company = Company.objects.create_company(**validated_data)
+        return company
 
 # TokenObtain personalizado para verificar la contraseña temporal
 class CustomTokenObtainPairSerializar(TokenObtainPairSerializer):
@@ -49,14 +56,14 @@ class CustomTokenObtainPairSerializar(TokenObtainPairSerializer):
         return data
     
 class ChangePasswordSerializer(serializers.Serializer):
-    old_password = serializers.CharField(required=True, write_only=True)
     new_password = serializers.CharField(required=True, write_only=True)
 
-    def validate_old_password(self, value):
-        user = self.context['user']
-        if not user.check_password(value):
-            raise serializers.ValidationError('La contraseña actual es incorrecta')
-        return value
+    # Para mas adelante
+    # def validate_old_password(self, value):
+    #     user = self.context['user']
+    #     if not user.check_password(value):
+    #         raise serializers.ValidationError('La contraseña actual es incorrecta')
+    #     return value
     
     def validate_new_password(self, value):
         validate_password(value)

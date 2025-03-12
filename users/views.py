@@ -6,6 +6,7 @@ from .serializers import UserSerializer, CustomTokenObtainPairSerializar
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.template.loader import get_template
 from rest_framework import permissions
+from rest_framework import status
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from .permissions import IsAdmin, IsAuditor, IsCliente, IsContador
@@ -54,7 +55,6 @@ class UsersView(APIView):
         users = User.objects.all()
         serializer = UserSerializer(users, many=True)
         return Response(serializer.data)
-
     
 # Envio para agregar clientes y guardar en la base de datos
 class sendEmail(APIView):
@@ -76,18 +76,18 @@ class sendEmail(APIView):
         user.temp_password_date = timezone.now()
         user.save()
 
-        email = request.data['email']
+        first_name = request.data['first_name']
         username = request.data['username']
         role = request.data['role']
 
         # datos del correo
         mail = create_email(
-            email,
+            username,
             'Enlace de Ingreso',
             'autorizacion.html',
             {
-                'username': username,
-                'email': email,
+                'nombre': first_name,
+                'email': username,
                 'password': temp_password,
                 'role': role,
             }
@@ -110,6 +110,7 @@ class ChangePassword(APIView):
         user = request.user
         # validar las contraseñas
         serializer = ChangePasswordSerializer(data=request.data, context={'user': user})
+        print(serializer)
 
         if serializer.is_valid():
             user.set_password(serializer.validated_data['new_password'])
@@ -118,35 +119,15 @@ class ChangePassword(APIView):
 
             # Actualizar la sesion de usuario
             update_session_auth_hash(request, user)
-
-            return Response ({'message': 'Contraseña cambiada exitosamente'})
+            return Response ({'message': 'Contraseña cambiada exitosamente'}, status=status.HTTP_202_ACCEPTED)
 
         else:
-            return Response({'contraseña': 'incorrecta'})
-
-# Vista en la que solo el admnistrador tiene acceso
-class AdminView(APIView):
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated, IsAdmin]
-
-    def get(self, request):
-        content = {'message': 'Hello, Admin!'}
-        return Response(content)
+            return Response({'contraseña': 'incorrecta'}, status=status.HTTP_403_FORBIDDEN)
     
-class ClientView(APIView):
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated, IsCliente]
-
-    def get(self, request):
-        content = {'message': 'Hello, Client!'}
-        return Response(content)
-    
-
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializar
 
 # ********* FUNCIONES **********
-
 # creacion del correo
 def create_email(user_email, subject, template_name, context):
     template = get_template(template_name)
